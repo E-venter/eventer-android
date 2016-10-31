@@ -142,6 +142,7 @@ public class MapsActivity extends FragmentActivity
     public void updateEventsWithinBounds(LatLngBounds latLngBounds, Location currentLocation){
         //communicate with database passing latLngBounds.northeast and southwest
         //remove previous events, add new events
+        System.out.println(getSeeableEvents("", "ID_USER", latLngBounds, currentLocation));
     }
 
     @Override
@@ -171,19 +172,18 @@ public class MapsActivity extends FragmentActivity
     }
 
     //Test method, not yet integrated
-    public String doPost(String databaseAddress, LatLngBounds latLngBounds, Location currentLocation) {
+    public String getSeeableEvents(String databaseAddress, String userId, LatLngBounds latLngBounds, Location currentLocation) {
         try {
             Client client = Client.create();
 
             WebResource webResource = client.resource(databaseAddress);
 
-            int someVariable = 0;
-
             LatLng llCurrentLocation = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
 
-            String input = "{\"currentLocation\":\""  + getJsonFromLatLng(llCurrentLocation) + "\"," +
-                            "\"cornerNE\":\""  + getJsonFromLatLng(latLngBounds.northeast) + "\"," +
-                            "\"cornerSW\":\""  + getJsonFromLatLng(latLngBounds.southwest) + "\"" +
+            String input = "{\"userId\":\"" + userId + "\"," +
+                            "\"currentLocation\":"  + getJsonFromLatLng(llCurrentLocation) + "," +
+                            "\"cornerNE\":"  + getJsonFromLatLng(latLngBounds.northeast) + "," +
+                            "\"cornerSW\":"  + getJsonFromLatLng(latLngBounds.southwest) +
                             "}";
 
             ClientResponse response = webResource.type("application/json")
@@ -194,8 +194,7 @@ public class MapsActivity extends FragmentActivity
                         + response.getStatus());
             }
 
-            String output = response.getEntity(String.class);
-            return output;
+            return response.getEntity(String.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
