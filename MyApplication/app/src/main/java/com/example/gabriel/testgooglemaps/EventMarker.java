@@ -13,19 +13,30 @@ public class EventMarker {
     private Marker marker;
     private Circle circle;
 
-    String s = "potato";
+    public Event event;
 
     public EventMarker(String title, LatLng latLng, GoogleMap googleMap){
         this(title, latLng, INITIAL_SIZE_RADIUS, googleMap);
     }
 
-    public EventMarker(String title, LatLng latLng, int radius, GoogleMap googleMap){
+    public EventMarker(String name, LatLng latLng, int radius, GoogleMap googleMap){
+        this(new Event(name, radius, latLng.latitude, latLng.longitude), googleMap);
+    }
+
+    public EventMarker(Event baseEvent, GoogleMap googleMap){
+        event = new Event();
+        event.name = baseEvent.name;
+        event.radius = baseEvent.radius;
+        event.latitude = baseEvent.latitude;
+        event.longitude = baseEvent.longitude;
+
+        LatLng latLng = new LatLng(event.latitude, event.longitude);
         MarkerOptions markerOptions = new MarkerOptions().position(latLng)
-                                                          .title(title)
-                                                          .draggable(false);
+                .title(event.name)
+                .draggable(false);
         CircleOptions circleOptions = new CircleOptions().center(latLng)
-                                                          .radius(radius)
-                                                          .strokeWidth(5f);
+                .radius(event.radius)
+                .strokeWidth(5f);
         marker = googleMap.addMarker(markerOptions);
         circle = googleMap.addCircle(circleOptions);
 

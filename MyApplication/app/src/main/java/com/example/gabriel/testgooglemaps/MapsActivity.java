@@ -1,12 +1,17 @@
 package com.example.gabriel.testgooglemaps;
 
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
+import android.support.v4.content.FileProvider;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -18,10 +23,25 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
+import com.google.gson.Gson;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.HttpMultipartMode;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Locale;
 
 public class MapsActivity extends FragmentActivity
@@ -94,7 +114,7 @@ public class MapsActivity extends FragmentActivity
             @Override
             public boolean onMarkerClick(Marker marker) {
                 if(marker.getTag() != null && marker.getTag() instanceof EventMarker) {
-                    System.out.println(((EventMarker) marker.getTag()).s);
+                    System.out.println(((EventMarker) marker.getTag()).event.name);
                 }
 
                 return false;
@@ -133,16 +153,9 @@ public class MapsActivity extends FragmentActivity
     @Override
     public void onCameraIdle() {
         //fazer on Idle ou no moved? verificação de velocidade de internet? pegar apenas eventos da nova area?
-        //no idea.
         LatLngBounds bounds = mMap.getProjection().getVisibleRegion().latLngBounds;
         updateEventsWithinBounds(bounds, mLastLocation);
-        System.out.println("idle");
-    }
-
-    public void updateEventsWithinBounds(LatLngBounds latLngBounds, Location currentLocation){
-        //communicate with database passing latLngBounds.northeast and southwest
-        //remove previous events, add new events
-        System.out.println(getSeeableEvents("", "ID_USER", latLngBounds, currentLocation));
+        //System.out.println("idle");
     }
 
     @Override
@@ -152,7 +165,7 @@ public class MapsActivity extends FragmentActivity
 
     @Override
     public void onCameraMove() {
-        System.out.println("moved");
+        //System.out.println("moved");
     }
 
     @Override
@@ -171,8 +184,12 @@ public class MapsActivity extends FragmentActivity
                 "\"longitude\":\"" + latLng.longitude + "\"" + "}";
     }
 
-    //Test method, not yet integrated
-    public String getSeeableEvents(String databaseAddress, String userId, LatLngBounds latLngBounds, Location currentLocation) {
+    private static String getJsonFromLocation(Location location){
+        return "{\"latitude\":\""  + location.getLatitude() + "\"," +
+                "\"longitude\":\"" + location.getLongitude() + "\"" + "}";
+    }
+
+    public EventList getVisibleEvents(String databaseAddress, String userId, LatLngBounds latLngBounds, Location currentLocation) {
         try {
             Client client = Client.create();
 
@@ -194,10 +211,147 @@ public class MapsActivity extends FragmentActivity
                         + response.getStatus());
             }
 
-            return response.getEntity(String.class);
+            String output = response.getEntity(String.class);
+
+            return new Gson().fromJson(output, EventList.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return null;
+    }
+
+    public String getUserID(){
+        return "USER_ID";
+    }
+
+    public void updateEventsWithinBounds(LatLngBounds latLngBounds, Location currentLocation){
+        //communicate with database passing latLngBounds.northeast and southwest
+        //remove previous events, add new events
+        mMap.clear();
+
+        EventList el = getVisibleEvents("", getUserID(), latLngBounds, currentLocation);
+        if(el != null){
+            for(Event e : el.list){
+                new EventMarker(e, mMap);
+            }
+        }
+    }
+
+    public CheckInError getCheckedInAtEvent(String eventId, String filePath, String urlString) {
+        if(imageToSendToCheckIn == null){
+            return new CheckInError(CheckInError.ERROR_NO_PHOTO, "No photo selected for Check In");
+        }
+
+        CloseableHttpClient client = HttpClients.createDefault();
+        HttpPost post = new HttpPost(urlString);
+
+        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+        builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+        builder.addTextBody("userId", getUserID());
+        builder.addTextBody("eventId", eventId);
+        builder.addTextBody("currentLocation", getJsonFromLocation(mLastLocation));
+        builder.addPart("image", new FileBody(imageToSendToCheckIn));
+
+        post.setEntity(builder.build());
+        try {
+            HttpResponse response = client.execute(post);
+            HttpEntity entity = response.getEntity();
+            CheckInError checkInResult = new Gson().fromJson(getHttpResponseContent(response), CheckInError.class);
+
+            EntityUtils.consume(entity);
+            client.close();
+
+            return checkInResult;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
+    }
+
+    private static class CheckInError{
+        public static final int ERROR_SUCCESS = 0;
+        public static final int ERROR_CONNECTION_FAILED = 1;
+        public static final int ERROR_NO_PHOTO = 2;
+        public static final int ERROR_ERROR3 = 3;
+
+        public int codError;
+        public String msgError;
+
+        public CheckInError(){}
+
+        public CheckInError(int codError, String msgError){
+            this.codError = codError;
+            this.msgError = msgError;
+        }
+    }
+
+    private String getHttpResponseContent(HttpResponse response) {
+        BufferedReader rd;
+        try {
+            rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+            String body;
+            String content = "";
+
+            while ((body = rd.readLine()) != null)
+            {
+                content += body;
+            }
+            return content.trim();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return "";
+    }
+
+
+    //To be used when we need to take the picture
+    static final int REQUEST_TAKE_PHOTO  = 1;
+    static File imageToSendToCheckIn = null;
+
+    private void dispatchTakePictureIntent() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        // Ensure that there's a camera activity to handle the intent
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+            }
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+                Uri photoURI = FileProvider.getUriForFile(this,
+                        "com.example.android.fileprovider",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
+            }
+        }
+    }
+
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK) {
+            String imagePath = getExternalFilesDir(Environment.DIRECTORY_PICTURES).getAbsolutePath();
+            imagePath = imagePath.endsWith("/") ? imagePath : imagePath + "/";
+
+            imageToSendToCheckIn = new File(imagePath + TEMP_IMAGE_FILE_NAME);
+        }
+    }
+
+    private final String TEMP_IMAGE_FILE_NAME = "temp";
+    private File createImageFile() throws IOException {
+        // Create an image file name
+        String imageFileName = TEMP_IMAGE_FILE_NAME;
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+
+        // Save a file: path for use with ACTION_VIEW intents
+        //mCurrentPhotoPath = "file:" + image.getAbsolutePath();
+        return image;
     }
 }
