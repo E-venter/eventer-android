@@ -269,17 +269,17 @@ public class MapsActivity extends FragmentActivity
     }
 
     private static class CheckInError{
-        public static final int ERROR_SUCCESS = 0;
-        public static final int ERROR_CONNECTION_FAILED = 1;
-        public static final int ERROR_NO_PHOTO = 2;
-        public static final int ERROR_ERROR3 = 3;
+        static final int ERROR_SUCCESS = 0;
+        static final int ERROR_CONNECTION_FAILED = 1;
+        static final int ERROR_NO_PHOTO = 2;
+        static final int ERROR_ERROR3 = 3;
 
-        public int codError;
-        public String msgError;
+        int codError;
+        String msgError;
 
-        public CheckInError(){}
+        CheckInError(){}
 
-        public CheckInError(int codError, String msgError){
+        CheckInError(int codError, String msgError){
             this.codError = codError;
             this.msgError = msgError;
         }
@@ -303,9 +303,9 @@ public class MapsActivity extends FragmentActivity
         return "";
     }
 
-
     //To be used when we need to take the picture
     static final int REQUEST_TAKE_PHOTO  = 1;
+    private final String TEMP_IMAGE_FILE_NAME = "temp";
     static File imageToSendToCheckIn = null;
 
     private void dispatchTakePictureIntent() {
@@ -333,13 +333,15 @@ public class MapsActivity extends FragmentActivity
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK) {
             String imagePath = getExternalFilesDir(Environment.DIRECTORY_PICTURES).getAbsolutePath();
-            imagePath = imagePath.endsWith("/") ? imagePath : imagePath + "/";
-
-            imageToSendToCheckIn = new File(imagePath + TEMP_IMAGE_FILE_NAME);
+            if(imagePath != null) {
+                imagePath = imagePath.endsWith("/") ? imagePath : imagePath + "/";
+                imageToSendToCheckIn = new File(imagePath + TEMP_IMAGE_FILE_NAME);
+            }else{
+                imageToSendToCheckIn = null;
+            }
         }
     }
 
-    private final String TEMP_IMAGE_FILE_NAME = "temp";
     private File createImageFile() throws IOException {
         // Create an image file name
         String imageFileName = TEMP_IMAGE_FILE_NAME;
