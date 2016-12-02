@@ -2,8 +2,11 @@ package com.example.gabriel.testgooglemaps;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.location.Location;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -24,25 +27,18 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.gson.Gson;
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.mime.HttpMultipartMode;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.entity.mime.content.FileBody;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
-
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.Locale;
+import java.util.RandomAccess;
 
 public class MapsActivity extends FragmentActivity
     implements OnMapReadyCallback,
@@ -58,6 +54,10 @@ public class MapsActivity extends FragmentActivity
 
     private Location mLastLocation;
     private boolean firstTimeGettingLocation = true;
+
+    private static final String URL_MAIN = "http://172.28.146.124:3000/";
+    private static final String URL_TO_GET_EVENTS = URL_MAIN + "sample/events/";
+    private static final String URL_TO_CHECK_IN = URL_MAIN + "sample/checkin/";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,7 +90,7 @@ public class MapsActivity extends FragmentActivity
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 0x0);
+            //requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 0x0);
             mMap.setMyLocationEnabled(true);
         }
         mMap.setMyLocationEnabled(true);
@@ -117,12 +117,67 @@ public class MapsActivity extends FragmentActivity
                     System.out.println(((EventMarker) marker.getTag()).event.name);
                 }
 
+                dispatchTakePictureIntent();
+
                 return false;
             }
         };
         mMap.setOnMarkerClickListener(onMarkerClickListener);
     }
 
+    public class NameValuePair{
+        String name;
+        String value;
+/*
+        public NameValuePair(String name, byte[] value){
+            this.name = name;
+            this.value = value;
+        }*/
+
+        public NameValuePair(String name, String value){
+            this.name = name;
+            this.value = value;
+        }
+    }
+
+    public String post(URL url, ArrayList<NameValuePair> values) {
+        try {
+
+            HttpPost httpPost = new HttpPost();
+            httpPost.setTarget(url);
+
+            for (NameValuePair value : values) {
+                httpPost.add(value.name, value.value);
+            }
+
+            return httpPost.send();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public String post(URL url, ArrayList<NameValuePair> values, byte[] image, String imageName) {
+        try {
+
+            HttpPost httpPost = new HttpPost();
+            httpPost.setTarget(url);
+
+            for (NameValuePair value : values) {
+                httpPost.add(value.name, value.value);
+            }
+
+            httpPost.image = image;
+            httpPost.imageName = imageName;
+
+            return httpPost.send();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
@@ -155,7 +210,7 @@ public class MapsActivity extends FragmentActivity
         //fazer on Idle ou no moved? verificação de velocidade de internet? pegar apenas eventos da nova area?
         LatLngBounds bounds = mMap.getProjection().getVisibleRegion().latLngBounds;
         updateEventsWithinBounds(bounds, mLastLocation);
-        //System.out.println("idle");
+        System.out.println("idle");
     }
 
     @Override
@@ -165,7 +220,7 @@ public class MapsActivity extends FragmentActivity
 
     @Override
     public void onCameraMove() {
-        //System.out.println("moved");
+        System.out.println("moved");
     }
 
     @Override
@@ -189,83 +244,116 @@ public class MapsActivity extends FragmentActivity
                 "\"longitude\":\"" + location.getLongitude() + "\"" + "}";
     }
 
-    public EventList getVisibleEvents(String databaseAddress, String userId, LatLngBounds latLngBounds, Location currentLocation) {
-        try {
-            Client client = Client.create();
-
-            WebResource webResource = client.resource(databaseAddress);
-
-            LatLng llCurrentLocation = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
-
-            String input = "{\"userId\":\"" + userId + "\"," +
-                            "\"currentLocation\":"  + getJsonFromLatLng(llCurrentLocation) + "," +
-                            "\"cornerNE\":"  + getJsonFromLatLng(latLngBounds.northeast) + "," +
-                            "\"cornerSW\":"  + getJsonFromLatLng(latLngBounds.southwest) +
-                            "}";
-
-            ClientResponse response = webResource.type("application/json")
-                    .post(ClientResponse.class, input);
-
-            if (response.getStatus() != 201) {
-                throw new RuntimeException("Failed : HTTP error code : "
-                        + response.getStatus());
-            }
-
-            String output = response.getEntity(String.class);
-
-            return new Gson().fromJson(output, EventList.class);
-        } catch (Exception e) {
-            e.printStackTrace();
+    public EventList getVisibleEvents(URL url, String userId, LatLngBounds latLngBounds, Location currentLocation) {
+        LatLng llCurrentLocation;
+        if(currentLocation == null){
+            llCurrentLocation = new LatLng(0, 0);
+        }else {
+            llCurrentLocation = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         }
-        return null;
+        String input = "{\"userId\":\"" + userId + "\"," +
+                "\"currentLocation\":"  + getJsonFromLatLng(llCurrentLocation) + "," +
+                "\"cornerNE\":"  + getJsonFromLatLng(latLngBounds.northeast) + "," +
+                "\"cornerSW\":"  + getJsonFromLatLng(latLngBounds.southwest) +
+                "}";
+
+        ArrayList<NameValuePair> nvps = new ArrayList<NameValuePair>();
+        nvps.add(new NameValuePair("info", input));
+
+        String postContent = post(url, nvps);
+        System.out.println("START " + postContent + " END");
+        if(postContent != null){
+            return new Gson().fromJson(postContent, EventList.class);
+        }else{
+            return null;
+        }
     }
 
     public String getUserID(){
         return "USER_ID";
     }
 
-    public void updateEventsWithinBounds(LatLngBounds latLngBounds, Location currentLocation){
+    public void updateEventsWithinBounds(final LatLngBounds latLngBounds, final Location currentLocation){
         //communicate with database passing latLngBounds.northeast and southwest
         //remove previous events, add new events
-        mMap.clear();
 
-        EventList el = getVisibleEvents("", getUserID(), latLngBounds, currentLocation);
-        if(el != null){
-            for(Event e : el.list){
-                new EventMarker(e, mMap);
+        AsyncTask<Integer, Integer, Integer> execute = new AsyncTask<Integer, Integer, Integer>() {
+            EventList el;
+
+            @Override
+            protected Integer doInBackground(Integer... params) {
+                System.out.println("gonna ask");
+
+                try {
+                    el = getVisibleEvents(new URL(URL_TO_GET_EVENTS), getUserID(), latLngBounds, currentLocation);
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("asked");
+
+                return null;
             }
-        }
+
+            protected void onPostExecute(Integer result) {
+                mMap.clear();
+                if (el != null) {
+                    for (Event e : el.list) {
+                        System.out.println(e.toString());
+                        new EventMarker(e, mMap);
+                    }
+                }
+            }
+        };
+
+        execute.execute();
     }
 
-    public CheckInError getCheckedInAtEvent(String eventId, String filePath, String urlString) {
-        if(imageToSendToCheckIn == null){
-            return new CheckInError(CheckInError.ERROR_NO_PHOTO, "No photo selected for Check In");
-        }
+    public void getCheckedInAtEvent(String eventId, String url) {
 
-        CloseableHttpClient client = HttpClients.createDefault();
-        HttpPost post = new HttpPost(urlString);
+        AsyncTask<String, Integer, Integer> execute = new AsyncTask<String, Integer, Integer>() {
+            CheckInError cie = null;
 
-        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-        builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-        builder.addTextBody("userId", getUserID());
-        builder.addTextBody("eventId", eventId);
-        builder.addTextBody("currentLocation", getJsonFromLocation(mLastLocation));
-        builder.addPart("image", new FileBody(imageToSendToCheckIn));
+            @Override
+            protected Integer doInBackground(String... params) {
+                System.out.println("gonna send image");
 
-        post.setEntity(builder.build());
-        try {
-            HttpResponse response = client.execute(post);
-            HttpEntity entity = response.getEntity();
-            CheckInError checkInResult = new Gson().fromJson(getHttpResponseContent(response), CheckInError.class);
+                String eventId = params[0];
+                String url = params[1];
 
-            EntityUtils.consume(entity);
-            client.close();
+                if(imageToSendToCheckIn == null){
+                    cie = new CheckInError(CheckInError.ERROR_NO_PHOTO, "No photo selected for Check In");
+                    return 0;
+                }
 
-            return checkInResult;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
+                ArrayList<NameValuePair> nvps = new ArrayList<NameValuePair>();
+                nvps.add(new NameValuePair("eventId", eventId));
+
+                String postContent;
+                try {
+                    postContent = post(new URL(url), nvps, imageToSendToCheckIn, imageToSendToCheckInName);
+
+                    System.out.println("START " + postContent + " END");
+                    if(postContent != null){
+                        cie =  new CheckInError(CheckInError.ERROR_SUCCESS, postContent);
+                    }else{
+                        cie =  new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
+                    }
+
+                    System.out.println("sent image");
+                } catch (MalformedURLException e) {
+                    System.out.println("NOT sent image");
+                    e.printStackTrace();
+                }
+                return 0;
+            }
+
+            protected void onPostExecute(Integer result) {
+                System.out.println(cie.msgError);
+            }
+        };
+
+        execute.execute(eventId, url);
+
     }
 
     private static class CheckInError{
@@ -285,37 +373,26 @@ public class MapsActivity extends FragmentActivity
         }
     }
 
-    private String getHttpResponseContent(HttpResponse response) {
-        BufferedReader rd;
-        try {
-            rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-            String body;
-            String content = "";
-
-            while ((body = rd.readLine()) != null)
-            {
-                content += body;
-            }
-            return content.trim();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
-
     //To be used when we need to take the picture
     static final int REQUEST_TAKE_PHOTO  = 1;
     private final String TEMP_IMAGE_FILE_NAME = "temp";
-    static File imageToSendToCheckIn = null;
+
+    byte[] imageToSendToCheckIn = null;
+    String imageToSendToCheckInName = null;
 
     private void dispatchTakePictureIntent() {
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         // Ensure that there's a camera activity to handle the intent
+        try {
+            createImageFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
             // Create the File where the photo should go
             File photoFile = null;
             try {
-                photoFile = createImageFile();
+                photoFile = getImageFile();
             } catch (IOException ex) {
                 // Error occurred while creating the File
             }
@@ -324,7 +401,7 @@ public class MapsActivity extends FragmentActivity
                 Uri photoURI = FileProvider.getUriForFile(this,
                         "com.example.android.fileprovider",
                         photoFile);
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                //takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
                 startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
             }
         }
@@ -332,28 +409,40 @@ public class MapsActivity extends FragmentActivity
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK) {
-            String imagePath = getExternalFilesDir(Environment.DIRECTORY_PICTURES).getAbsolutePath();
-            if(imagePath != null) {
-                imagePath = imagePath.endsWith("/") ? imagePath : imagePath + "/";
-                imageToSendToCheckIn = new File(imagePath + TEMP_IMAGE_FILE_NAME);
-            }else{
-                imageToSendToCheckIn = null;
+            try {
+                File imageFile = getImageFile();
+                Bitmap photo = (Bitmap) data.getExtras().get("data");
+
+                Matrix matrix = new Matrix();
+                matrix.postRotate(90);
+                Bitmap rotatedBitmap = Bitmap.createBitmap(photo , 0, 0, photo.getWidth(), photo.getHeight(), matrix, true);
+
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+                imageToSendToCheckIn = stream.toByteArray();
+                imageToSendToCheckInName = TEMP_IMAGE_FILE_NAME + ".jpg";
+
+
+                System.out.println("RESULT DA IMAGE");
+                getCheckedInAtEvent("1001001", URL_TO_CHECK_IN);
+            }catch(IOException e){
+                e.printStackTrace();
             }
         }
     }
 
     private File createImageFile() throws IOException {
-        // Create an image file name
-        String imageFileName = TEMP_IMAGE_FILE_NAME;
-        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        File image = File.createTempFile(
-                imageFileName,  /* prefix */
-                ".jpg",         /* suffix */
-                storageDir      /* directory */
-        );
+        File newFile = getImageFile();
+        newFile.createNewFile();
 
-        // Save a file: path for use with ACTION_VIEW intents
-        //mCurrentPhotoPath = "file:" + image.getAbsolutePath();
-        return image;
+        return newFile;
+    }
+
+    private File getImageFile() throws IOException {
+        File imagePath = new File(getFilesDir(), "temp_images");
+        imagePath.mkdirs();
+        File newFile = new File(imagePath, "default_image.jpg");
+
+        return newFile;
     }
 }

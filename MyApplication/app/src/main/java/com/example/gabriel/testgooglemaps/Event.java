@@ -1,11 +1,10 @@
 package com.example.gabriel.testgooglemaps;
 
 class Event {
+    public String name = "";
     public double latitude = 0.0;
     public double longitude = 0.0;
     public double radius = 0.0;
-
-    public String name = "";
 
     public Event(){}
 
@@ -14,5 +13,9 @@ class Event {
         this.radius = radius;
         this.latitude = latitude;
         this.longitude = longitude;
+    }
+
+    public String toString(){
+        return "name:" + name + " radius:" + radius + " latitude:" + latitude + " longitude:" + longitude;
     }
 }
