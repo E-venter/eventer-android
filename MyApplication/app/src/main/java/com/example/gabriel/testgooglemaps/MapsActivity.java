@@ -425,7 +425,6 @@ public class MapsActivity extends FragmentActivity
                         Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_SHORT).show();
                     }
 
-
                 } catch (MalformedURLException e) {
                     System.out.println("NOT sent image");
                     e.printStackTrace();

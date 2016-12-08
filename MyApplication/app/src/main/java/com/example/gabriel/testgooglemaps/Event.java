@@ -34,7 +34,7 @@ class Event {
         this.name = name;
         this.latitude = latitude;
         this.longitude = longitude;
-        this.radius = radius;
+        this.radius = radius > 0 ? radius : 0;
         this.start_time = start_time;
         this.end_time = end_time;
         this.id = id;
@@ -49,7 +49,7 @@ class Event {
         return "name:" + name + " radius:" + radius + " latitude:" + latitude + " longitude:" + longitude;
     }
 
-    public boolean equals(Event e){
-        return id == e.id;
+    public boolean equals(Object e) {
+        return e instanceof Event && id == ((Event) e).id;
     }
 }

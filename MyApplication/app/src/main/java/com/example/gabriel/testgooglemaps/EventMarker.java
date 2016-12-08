@@ -28,7 +28,7 @@ public class EventMarker {
     public EventMarker(Event baseEvent, GoogleMap googleMap){
         event = new Event();
         event.name = baseEvent.name;
-        event.radius = baseEvent.radius;
+        event.radius = baseEvent.radius > 0 ? baseEvent.radius : 0;
         event.latitude = baseEvent.latitude;
         event.longitude = baseEvent.longitude;
 
