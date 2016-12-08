@@ -3,6 +3,7 @@ package com.example.gabriel.testgooglemaps;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.location.Location;
 import android.net.Uri;
@@ -30,7 +31,6 @@ import com.google.gson.Gson;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
@@ -58,14 +58,19 @@ public class MapsActivity extends FragmentActivity
 
     public static final String URL_MAIN = "http://172.26.184.65:3000/";
     public static final String URL_TO_GET_EVENTS = URL_MAIN + "events/around/";
-    public static final String URL_TO_CHECK_IN = URL_MAIN + "sample/checkin/";
+    public static final String URL_TO_CHECK_IN = URL_MAIN + "checkin/";
     public static final String URL_TO_NEW_EVENT = URL_MAIN + "sample/events/";
     public static final String URL_TO_LOGIN = URL_MAIN + "api/auth/sign_in/";
+    public static final String URL_TO_SIGN_UP = URL_MAIN + "api/auth/";
+
+
 
     static final int REQUEST_TAKE_PHOTO  = 1;
     static final int REQUEST_LOGIN  = 2;
 
     public String client = null, uid = null, token = null;
+
+    public String selectedEventId = "";
 
     public ArrayList<Event> eventList = new ArrayList<>();
 
@@ -166,9 +171,11 @@ public class MapsActivity extends FragmentActivity
             public boolean onMarkerClick(Marker marker) {
                 if(marker.getTag() != null && marker.getTag() instanceof EventMarker) {
                     System.out.println(((EventMarker) marker.getTag()).event.name);
-                }
 
-                //dispatchTakePictureIntent();
+                    selectedEventId = ((EventMarker) marker.getTag()).event.id + "";
+
+                    dispatchTakePictureIntent();
+                }
 
                 return false;
             }
@@ -299,7 +306,7 @@ public class MapsActivity extends FragmentActivity
                 "\"longitude\":\"" + location.getLongitude() + "\"" + "}";
     }
 
-    public EventList getVisibleEvents(URL url, LatLngBounds latLngBounds, Location currentLocation) {
+    public HttpPost getVisibleEvents(URL url, LatLngBounds latLngBounds, Location currentLocation) {
         LatLng llCurrentLocation;
         if(currentLocation == null){
             llCurrentLocation = new LatLng(0, 0);
@@ -316,22 +323,8 @@ public class MapsActivity extends FragmentActivity
         nvps.add(new NameValuePair("info", input));
 
         HttpPost post = post(url, nvps);
-        String postContent = post.response;
 
-        if(post.responseCode == HttpURLConnection.HTTP_OK) {
-            System.out.println("START " + postContent + " END");
-            if (postContent != null) {
-                return new Gson().fromJson(postContent, EventList.class);
-            } else {
-                return null;
-            }
-        }else if(post.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED){
-            requestLogin();
-        }else{
-            Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_SHORT).show();
-        }
-
-        return null;
+        return post;
     }
 
     public String getClient(){
@@ -350,15 +343,15 @@ public class MapsActivity extends FragmentActivity
         //communicate with database passing latLngBounds.northeast and southwest
         //remove previous events, add new events
 
-        AsyncTask<Integer, Integer, Integer> execute = new AsyncTask<Integer, Integer, Integer>() {
+        AsyncTask<Integer, Integer, HttpPost> execute = new AsyncTask<Integer, Integer, HttpPost>() {
             EventList el;
 
             @Override
-            protected Integer doInBackground(Integer... params) {
+            protected HttpPost doInBackground(Integer... params) {
                 System.out.println("gonna ask");
 
                 try {
-                    el = getVisibleEvents(new URL(URL_TO_GET_EVENTS), latLngBounds, currentLocation);
+                    return getVisibleEvents(new URL(URL_TO_GET_EVENTS), latLngBounds, currentLocation);
                 } catch (MalformedURLException e) {
                     e.printStackTrace();
                 }
@@ -367,18 +360,37 @@ public class MapsActivity extends FragmentActivity
                 return null;
             }
 
-            protected void onPostExecute(Integer result) {
-                //mMap.clear();
-                if (el != null && el.list != null) {
-                    for (Event e : el.list) {
-                        System.out.println(e.toString());
+            protected void onPostExecute(HttpPost result) {
+                if(result == null) return;
 
-                        if(!eventList.contains(e)){
-                            new EventMarker(e, mMap);
-                            eventList.add(e);
+                String postContent = result.response;
+
+                if(result.responseCode == HttpURLConnection.HTTP_OK) {
+                    System.out.println("START " + postContent + " END");
+                    if (postContent != null) {
+                        el = new Gson().fromJson(postContent, EventList.class);
+
+                        //mMap.clear();
+                        if (el != null && el.list != null) {
+                            for (Event e : el.list) {
+                                System.out.println(e.toString());
+
+                                if(!eventList.contains(e)){
+                                    new EventMarker(e, mMap);
+                                    eventList.add(e);
+                                }
+                            }
+                            System.out.println(eventList.size());
                         }
+                    } else {
+                        return;
                     }
-                    System.out.println(eventList.size());
+                }else if(result.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED){
+                    requestLogin();
+                    return;
+                }else{
+                    System.out.println("ERROR: " + result.responseCode);
+                    Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_SHORT).show();
                 }
             }
         };
@@ -386,13 +398,13 @@ public class MapsActivity extends FragmentActivity
         execute.execute();
     }
 
-    public void getCheckedInAtEvent(String eventId, String url) {
+    public void getCheckedInAtEvent(String eventId, String url, final LatLng currentLocation) {
 
-        AsyncTask<String, Integer, Integer> execute = new AsyncTask<String, Integer, Integer>() {
+        AsyncTask<String, Integer, HttpPost> execute = new AsyncTask<String, Integer, HttpPost>() {
             CheckInError cie = null;
 
             @Override
-            protected Integer doInBackground(String... params) {
+            protected HttpPost doInBackground(String... params) {
                 System.out.println("gonna send image");
 
                 String eventId = params[0];
@@ -400,40 +412,40 @@ public class MapsActivity extends FragmentActivity
 
                 if(imageToSendToCheckIn == null){
                     cie = new CheckInError(CheckInError.ERROR_NO_PHOTO, "No photo selected for Check In");
-                    return 0;
+                    return null;
                 }
 
                 ArrayList<NameValuePair> nvps = new ArrayList<NameValuePair>();
-                nvps.add(new NameValuePair("eventId", eventId));
-
-                String postContent;
+                nvps.add(new NameValuePair("event_id", eventId));
+                nvps.add(new NameValuePair("location", getJsonFromLatLng(currentLocation)));
                 try {
-                    HttpPost post = post(new URL(url), nvps, imageToSendToCheckIn, imageToSendToCheckInName);
-                    postContent = post.response;
+                    return post(new URL(url), nvps, imageToSendToCheckIn, imageToSendToCheckInName);
+                }catch(Exception e){
 
-                    if(post.responseCode == HttpURLConnection.HTTP_OK){
-                        System.out.println("START " + postContent + " END");
-                        if(postContent != null){
-                            cie =  new CheckInError(CheckInError.ERROR_SUCCESS, postContent);
-                        }else{
-                            cie =  new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
-                        }
-                        System.out.println("sent image");
-                    }else if(post.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED){
-                        requestLogin();
-                    }else{
-                        Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_SHORT).show();
-                    }
-
-                } catch (MalformedURLException e) {
-                    System.out.println("NOT sent image");
-                    e.printStackTrace();
                 }
-                return 0;
+
+                return null;
             }
 
-            protected void onPostExecute(Integer result) {
+            protected void onPostExecute(HttpPost result) {
+                String postContent;
 
+                HttpPost post = result;
+                postContent = post.response;
+
+                if(post.responseCode == HttpURLConnection.HTTP_OK){
+                    System.out.println("START " + postContent + " END");
+                    if(postContent != null){
+                        cie =  new CheckInError(CheckInError.ERROR_SUCCESS, postContent);
+                    }else{
+                        cie =  new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
+                    }
+                    System.out.println("sent image");
+                }else if(post.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED){
+                    requestLogin();
+                }else{
+                    Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_LONG).show();
+                }
             }
         };
 
@@ -441,7 +453,7 @@ public class MapsActivity extends FragmentActivity
 
     }
 
-    private static class CheckInError{
+    public static class CheckInError{
         static final int ERROR_SUCCESS = 0;
         static final int ERROR_CONNECTION_FAILED = 1;
         static final int ERROR_NO_PHOTO = 2;
@@ -459,7 +471,7 @@ public class MapsActivity extends FragmentActivity
     }
 
     //To be used when we need to take the picture
-    private final String TEMP_IMAGE_FILE_NAME = "temp";
+    public static final String TEMP_IMAGE_FILE_NAME = "temp";
 
     byte[] imageToSendToCheckIn = null;
     String imageToSendToCheckInName = null;
@@ -495,20 +507,30 @@ public class MapsActivity extends FragmentActivity
         if (requestCode == REQUEST_TAKE_PHOTO && resultCode == RESULT_OK) {
             try {
                 File imageFile = getImageFile();
-                Bitmap photo = (Bitmap) data.getExtras().get("data");
 
-                Matrix matrix = new Matrix();
-                matrix.postRotate(90);
-                Bitmap rotatedBitmap = Bitmap.createBitmap(photo , 0, 0, photo.getWidth(), photo.getHeight(), matrix, true);
+                Bitmap photo = BitmapFactory.decodeFile(imageFile.getAbsolutePath());
 
-                ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
-                imageToSendToCheckIn = stream.toByteArray();
-                imageToSendToCheckInName = TEMP_IMAGE_FILE_NAME + ".jpg";
+                System.out.println(imageFile.getAbsolutePath());
+                System.out.println(imageFile.exists());
+
+                if(photo != null) {
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+
+                    photo.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+                    imageToSendToCheckIn = stream.toByteArray();
+                    imageToSendToCheckInName = MapsActivity.TEMP_IMAGE_FILE_NAME + ".jpg";
+                    imageToSendToCheckInName = MapsActivity.TEMP_IMAGE_FILE_NAME + ".jpg";
 
 
-                System.out.println("RESULT DA IMAGE");
-                getCheckedInAtEvent("1001001", URL_TO_CHECK_IN);
+                    LatLng llCurrentLocation;
+                    if (mLastLocation == null) {
+                        llCurrentLocation = new LatLng(0, 0);
+                    } else {
+                        llCurrentLocation = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+                    }
+
+                    getCheckedInAtEvent(selectedEventId, URL_TO_CHECK_IN, llCurrentLocation);
+                }
             }catch(IOException e){
                 e.printStackTrace();
             }

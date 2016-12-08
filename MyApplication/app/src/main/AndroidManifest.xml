@@ -63,6 +63,10 @@
         <activity
             android:name=".LoginActivity"
             android:label="@string/title_activity_login"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+        <activity
+            android:name=".CadastrarActivity"
+            android:label="@string/title_activity_cadastrar"
             android:theme="@style/AppTheme.NoActionBar"></activity>
     </application>
 

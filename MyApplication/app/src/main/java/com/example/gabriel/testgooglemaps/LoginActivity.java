@@ -9,6 +9,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.net.MalformedURLException;
@@ -21,41 +23,60 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        final AppCompatActivity aux = this;
+
+        ImageButton fab = (ImageButton) findViewById(R.id.LoginGo);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+                onClick_login();
+
+                /*
+                //faz as verificacoes de login aqui
+                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);*/
+            }
+        });
+/*
+        ImageButton esqueci = (ImageButton) findViewById(R.id.esqueciSenha);
+        esqueci.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent recuperarSenha = new Intent(LoginActivity.this, LoginPasswordForgottenActivity.class);
+                recuperarSenha.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(recuperarSenha);
+            }
+        });*/
+
+        ImageButton cadastrar = (ImageButton) findViewById(R.id.criarConta);
+        cadastrar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                //faz as verificacoes de login aqui
+                //fzer a cadastrarAc
+
+                Intent cadastrar = new Intent(LoginActivity.this, CadastrarActivity.class);
+                //cadastrar.putExtra("activity", aux);
+                startActivity(cadastrar);
             }
         });
     }
 
-    public void onClick_login(View v){
-        /*
-        Intent intent = this.getIntent();
-        intent.putExtra("client", "PDDMZWZ8asi3KXz3hoJCig");
-        intent.putExtra("uid", "joseph@mailinator.com");
-        intent.putExtra("auth", "JJrhZMlFNSu1mcgvpEKPSg");
-        this.setResult(RESULT_OK, intent);
-        finish();
-        */
+    public void onClick_login(){
 
-        EditText mEdit   = (EditText)findViewById(R.id.editText);
-        EditText mPassword   = (EditText)findViewById(R.id.editText2);
+        EditText email = (EditText)findViewById(R.id.emailLogin);
+        EditText password = (EditText)findViewById(R.id.senhaLogin);
 
         try {
-            sendLoginMessage(new URL(MapsActivity.URL_TO_LOGIN), mEdit.getText().toString(), mPassword.getText().toString(), this, this.getIntent());
+            sendLoginMessage(new URL(MapsActivity.URL_TO_LOGIN), email.getText().toString(), password.getText().toString(), this, this.getIntent());
         } catch (MalformedURLException e) {
         }
     }
 
     public void sendLoginMessage(final URL url, final String email, final String password, final AppCompatActivity act, final Intent my_intent){
         AsyncTask<Integer, Integer, HttpPost> execute = new AsyncTask<Integer, Integer, HttpPost>() {
-            EventList el;
 
             @Override
             protected HttpPost doInBackground(Integer... params) {
@@ -63,17 +84,6 @@ public class LoginActivity extends AppCompatActivity {
             }
 
             protected void onPostExecute(HttpPost result) {
-                /*
-                System.out.println("HEADER");
-                for(String key : result.responseHeader.keySet()){
-                    for(String value : result.responseHeader.get(key)){
-                        System.out.println(key + " : " + value);
-                    }
-                }
-                */
-
-
-
                 if(result.responseHeader.containsKey("Access-Token") &&
                         result.responseHeader.containsKey("Client") &&
                         result.responseHeader.containsKey("Uid")){
@@ -88,11 +98,8 @@ public class LoginActivity extends AppCompatActivity {
                     act.setResult(RESULT_OK, intent);
                     finish();
                 }else{
-                    //act.setResult(RESULT_CANCELED);
-                    //finish();
-                    Toast.makeText(getApplicationContext(), "Wrong Email/Password!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getApplicationContext(), "Erro no Email/Password!", Toast.LENGTH_SHORT).show();
                 }
-
             }
         };
 
@@ -104,7 +111,6 @@ public class LoginActivity extends AppCompatActivity {
 
             HttpPost httpPost = new HttpPost(url, "", "", "");
 
-            //String info = "{"+"\"email\" : \"" + email + "\" \"password\" : \""+password+"\""+"}";
             httpPost.add("email", email);
             httpPost.add("password", password);
             httpPost.send();

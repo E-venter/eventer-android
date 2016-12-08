@@ -214,7 +214,12 @@ public class HttpPost {
             System.out.println(completeLine);
             response = completeLine;
         }catch (Exception e){
-
+            try {
+                responseCode = conn.getResponseCode();
+                return responseCode;
+            }catch(Exception ee){
+                return 998;
+            }
         }
 
         responseCode = conn.getResponseCode();
