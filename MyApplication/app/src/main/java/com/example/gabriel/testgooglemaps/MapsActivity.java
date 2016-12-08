@@ -8,13 +8,13 @@ import android.location.Location;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.FileProvider;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -31,14 +31,15 @@ import com.google.gson.Gson;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Locale;
-import java.util.RandomAccess;
+import java.util.Scanner;
 
 public class MapsActivity extends FragmentActivity
     implements OnMapReadyCallback,
@@ -55,9 +56,18 @@ public class MapsActivity extends FragmentActivity
     private Location mLastLocation;
     private boolean firstTimeGettingLocation = true;
 
-    private static final String URL_MAIN = "http://172.28.146.124:3000/";
-    private static final String URL_TO_GET_EVENTS = URL_MAIN + "sample/events/";
-    private static final String URL_TO_CHECK_IN = URL_MAIN + "sample/checkin/";
+    public static final String URL_MAIN = "http://172.26.184.65:3000/";
+    public static final String URL_TO_GET_EVENTS = URL_MAIN + "events/around/";
+    public static final String URL_TO_CHECK_IN = URL_MAIN + "sample/checkin/";
+    public static final String URL_TO_NEW_EVENT = URL_MAIN + "sample/events/";
+    public static final String URL_TO_LOGIN = URL_MAIN + "api/auth/sign_in/";
+
+    static final int REQUEST_TAKE_PHOTO  = 1;
+    static final int REQUEST_LOGIN  = 2;
+
+    public String client = null, uid = null, token = null;
+
+    public ArrayList<Event> eventList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +83,16 @@ public class MapsActivity extends FragmentActivity
                 .addOnConnectionFailedListener(this)
                 .addApi(LocationServices.API)
                 .build();
+
+        if(!getCredentialsFromFile()) {
+            requestLogin();
+        }
+    }
+
+    public void requestLogin(){
+        startActivityForResult(
+            new Intent(this, LoginActivity.class),
+            REQUEST_LOGIN);
     }
 
     @Override
@@ -81,19 +101,40 @@ public class MapsActivity extends FragmentActivity
         super.onStart();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
     protected void onStop() {
         mGoogleApiClient.disconnect();
         super.onStop();
     }
 
+
+
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        switch(requestCode) {
+            case 0:
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    mMap.setMyLocationEnabled(true);
+                }
+                else {
+
+                }
+                break;
+        }
+    }
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            //requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 0x0);
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 0x0);
+            //mMap.setMyLocationEnabled(true);
+        }else {
             mMap.setMyLocationEnabled(true);
         }
-        mMap.setMyLocationEnabled(true);
 
         mMap.setOnCameraIdleListener(this);
         mMap.setOnCameraMoveStartedListener(this);
@@ -105,7 +146,17 @@ public class MapsActivity extends FragmentActivity
             public void onMapClick(LatLng latLng) {
                 String floatFormat = "%1$.3f";
                 String s = "Marker in " + String.format(Locale.US, floatFormat, latLng.latitude) + ", " + String.format(Locale.US, floatFormat, latLng.longitude);
-                new EventMarker(s, latLng, mMap);
+                EventMarker em = new EventMarker(s, latLng, new Date(), new Date(), mMap);
+
+                String eventString = new Gson().toJson(em.event);
+                ArrayList<NameValuePair> nvps = new ArrayList<>();
+                nvps.add(new NameValuePair("info", eventString));
+
+                System.out.println(eventString);
+
+                try {
+                    simpleParalelPost(new URL(URL_TO_NEW_EVENT), nvps);
+                } catch (MalformedURLException e) {}
             }
         };
         mMap.setOnMapClickListener(onMapClickListener);
@@ -117,7 +168,7 @@ public class MapsActivity extends FragmentActivity
                     System.out.println(((EventMarker) marker.getTag()).event.name);
                 }
 
-                dispatchTakePictureIntent();
+                //dispatchTakePictureIntent();
 
                 return false;
             }
@@ -125,32 +176,35 @@ public class MapsActivity extends FragmentActivity
         mMap.setOnMarkerClickListener(onMarkerClickListener);
     }
 
-    public class NameValuePair{
-        String name;
-        String value;
-/*
-        public NameValuePair(String name, byte[] value){
-            this.name = name;
-            this.value = value;
-        }*/
+    public void simpleParalelPost(final URL url, final ArrayList<NameValuePair> values){
+        AsyncTask<Integer, Integer, Integer> execute = new AsyncTask<Integer, Integer, Integer>() {
+            @Override
+            protected Integer doInBackground(Integer... params) {
+                post(url, values);
 
-        public NameValuePair(String name, String value){
-            this.name = name;
-            this.value = value;
-        }
-    }
-
-    public String post(URL url, ArrayList<NameValuePair> values) {
-        try {
-
-            HttpPost httpPost = new HttpPost();
-            httpPost.setTarget(url);
-
-            for (NameValuePair value : values) {
-                httpPost.add(value.name, value.value);
+                return null;
             }
 
-            return httpPost.send();
+            protected void onPostExecute(Integer result) {
+
+            }
+        };
+
+        execute.execute();
+    }
+
+    public HttpPost post(URL url, ArrayList<NameValuePair> values) {
+        try {
+
+            HttpPost httpPost = new HttpPost(url, getToken(), getClient(), getUid());
+
+            for (NameValuePair value : values) {
+                httpPost.add(value);
+            }
+
+            httpPost.send();
+
+            return httpPost;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -158,20 +212,21 @@ public class MapsActivity extends FragmentActivity
         return null;
     }
 
-    public String post(URL url, ArrayList<NameValuePair> values, byte[] image, String imageName) {
+    public HttpPost post(URL url, ArrayList<NameValuePair> values, byte[] image, String imageName) {
         try {
 
-            HttpPost httpPost = new HttpPost();
-            httpPost.setTarget(url);
+            HttpPost httpPost = new HttpPost(url, getToken(), getClient(), getUid());
 
             for (NameValuePair value : values) {
-                httpPost.add(value.name, value.value);
+                httpPost.add(value);
             }
 
             httpPost.image = image;
             httpPost.imageName = imageName;
 
-            return httpPost.send();
+            httpPost.send();
+
+            return httpPost;
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -244,33 +299,51 @@ public class MapsActivity extends FragmentActivity
                 "\"longitude\":\"" + location.getLongitude() + "\"" + "}";
     }
 
-    public EventList getVisibleEvents(URL url, String userId, LatLngBounds latLngBounds, Location currentLocation) {
+    public EventList getVisibleEvents(URL url, LatLngBounds latLngBounds, Location currentLocation) {
         LatLng llCurrentLocation;
         if(currentLocation == null){
             llCurrentLocation = new LatLng(0, 0);
         }else {
             llCurrentLocation = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         }
-        String input = "{\"userId\":\"" + userId + "\"," +
-                "\"currentLocation\":"  + getJsonFromLatLng(llCurrentLocation) + "," +
-                "\"cornerNE\":"  + getJsonFromLatLng(latLngBounds.northeast) + "," +
-                "\"cornerSW\":"  + getJsonFromLatLng(latLngBounds.southwest) +
+        String input = "{" +
+                "\"current_location\":"  + getJsonFromLatLng(llCurrentLocation) + "," +
+                "\"corner_ne\":"  + getJsonFromLatLng(latLngBounds.northeast) + "," +
+                "\"corner_sw\":"  + getJsonFromLatLng(latLngBounds.southwest) +
                 "}";
 
         ArrayList<NameValuePair> nvps = new ArrayList<NameValuePair>();
         nvps.add(new NameValuePair("info", input));
 
-        String postContent = post(url, nvps);
-        System.out.println("START " + postContent + " END");
-        if(postContent != null){
-            return new Gson().fromJson(postContent, EventList.class);
+        HttpPost post = post(url, nvps);
+        String postContent = post.response;
+
+        if(post.responseCode == HttpURLConnection.HTTP_OK) {
+            System.out.println("START " + postContent + " END");
+            if (postContent != null) {
+                return new Gson().fromJson(postContent, EventList.class);
+            } else {
+                return null;
+            }
+        }else if(post.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED){
+            requestLogin();
         }else{
-            return null;
+            Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_SHORT).show();
         }
+
+        return null;
     }
 
-    public String getUserID(){
-        return "USER_ID";
+    public String getClient(){
+        return client;//"USER_ID";
+    }
+
+    public String getToken(){
+        return token;//"Auth";
+    }
+
+    public String getUid(){
+        return uid;//"email";
     }
 
     public void updateEventsWithinBounds(final LatLngBounds latLngBounds, final Location currentLocation){
@@ -285,7 +358,7 @@ public class MapsActivity extends FragmentActivity
                 System.out.println("gonna ask");
 
                 try {
-                    el = getVisibleEvents(new URL(URL_TO_GET_EVENTS), getUserID(), latLngBounds, currentLocation);
+                    el = getVisibleEvents(new URL(URL_TO_GET_EVENTS), latLngBounds, currentLocation);
                 } catch (MalformedURLException e) {
                     e.printStackTrace();
                 }
@@ -295,12 +368,17 @@ public class MapsActivity extends FragmentActivity
             }
 
             protected void onPostExecute(Integer result) {
-                mMap.clear();
-                if (el != null) {
+                //mMap.clear();
+                if (el != null && el.list != null) {
                     for (Event e : el.list) {
                         System.out.println(e.toString());
-                        new EventMarker(e, mMap);
+
+                        if(!eventList.contains(e)){
+                            new EventMarker(e, mMap);
+                            eventList.add(e);
+                        }
                     }
+                    System.out.println(eventList.size());
                 }
             }
         };
@@ -330,16 +408,24 @@ public class MapsActivity extends FragmentActivity
 
                 String postContent;
                 try {
-                    postContent = post(new URL(url), nvps, imageToSendToCheckIn, imageToSendToCheckInName);
+                    HttpPost post = post(new URL(url), nvps, imageToSendToCheckIn, imageToSendToCheckInName);
+                    postContent = post.response;
 
-                    System.out.println("START " + postContent + " END");
-                    if(postContent != null){
-                        cie =  new CheckInError(CheckInError.ERROR_SUCCESS, postContent);
+                    if(post.responseCode == HttpURLConnection.HTTP_OK){
+                        System.out.println("START " + postContent + " END");
+                        if(postContent != null){
+                            cie =  new CheckInError(CheckInError.ERROR_SUCCESS, postContent);
+                        }else{
+                            cie =  new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
+                        }
+                        System.out.println("sent image");
+                    }else if(post.responseCode == HttpURLConnection.HTTP_UNAUTHORIZED){
+                        requestLogin();
                     }else{
-                        cie =  new CheckInError(CheckInError.ERROR_CONNECTION_FAILED, "Connection Timed Out");
+                        Toast.makeText(getApplicationContext(), "Error on Server Connection!", Toast.LENGTH_SHORT).show();
                     }
 
-                    System.out.println("sent image");
+
                 } catch (MalformedURLException e) {
                     System.out.println("NOT sent image");
                     e.printStackTrace();
@@ -348,7 +434,7 @@ public class MapsActivity extends FragmentActivity
             }
 
             protected void onPostExecute(Integer result) {
-                System.out.println(cie.msgError);
+
             }
         };
 
@@ -374,7 +460,6 @@ public class MapsActivity extends FragmentActivity
     }
 
     //To be used when we need to take the picture
-    static final int REQUEST_TAKE_PHOTO  = 1;
     private final String TEMP_IMAGE_FILE_NAME = "temp";
 
     byte[] imageToSendToCheckIn = null;
@@ -428,6 +513,18 @@ public class MapsActivity extends FragmentActivity
             }catch(IOException e){
                 e.printStackTrace();
             }
+        }else if(requestCode == REQUEST_LOGIN){
+            if(resultCode == RESULT_OK){
+                client = data.getStringExtra("client");
+                uid = data.getStringExtra("uid");
+                token = data.getStringExtra("auth");
+
+                storeLoginCredentials();
+            }else{
+                startActivityForResult(
+                    new Intent(this, LoginActivity.class),
+                    REQUEST_LOGIN);
+            }
         }
     }
 
@@ -444,5 +541,40 @@ public class MapsActivity extends FragmentActivity
         File newFile = new File(imagePath, "default_image.jpg");
 
         return newFile;
+    }
+
+    private File getLoginCredentialsFile(){
+        File path = new File(getFilesDir(), "login_credentials");
+        path.mkdirs();
+        File newFile = new File(path, "credentials.dat");
+
+        return newFile;
+    }
+
+    private void storeLoginCredentials(){
+        File newFile = getLoginCredentialsFile();
+
+        try(PrintWriter writer = new PrintWriter(newFile, "UTF-8")) {
+            writer.println(uid);
+            writer.println(token);
+            writer.println(client);
+            writer.close();
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public boolean getCredentialsFromFile(){
+        File newFile = getLoginCredentialsFile();
+
+        try {
+            Scanner scanner = new Scanner(newFile);
+            uid = scanner.nextLine();
+            token = scanner.nextLine();
+            client = scanner.nextLine();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

@@ -7,6 +7,8 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.util.Date;
+
 public class EventMarker {
     private static final int INITIAL_SIZE_RADIUS = 100;
 
@@ -15,12 +17,12 @@ public class EventMarker {
 
     public Event event;
 
-    public EventMarker(String title, LatLng latLng, GoogleMap googleMap){
-        this(title, latLng, INITIAL_SIZE_RADIUS, googleMap);
+    public EventMarker(String title, LatLng latLng, Date startDate, Date endDate, GoogleMap googleMap){
+        this(title, latLng, INITIAL_SIZE_RADIUS, startDate, endDate, googleMap);
     }
 
-    public EventMarker(String name, LatLng latLng, int radius, GoogleMap googleMap){
-        this(new Event(name, radius, latLng.latitude, latLng.longitude), googleMap);
+    public EventMarker(String name, LatLng latLng, int radius, Date startDate, Date endDate, GoogleMap googleMap){
+        this(new Event(name, radius, latLng.latitude, latLng.longitude, startDate.getTime(), endDate.getTime(), 0, "", "", "", "", ""), googleMap);
     }
 
     public EventMarker(Event baseEvent, GoogleMap googleMap){

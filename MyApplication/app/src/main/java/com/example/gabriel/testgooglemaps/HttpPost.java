@@ -1,31 +1,22 @@
 package com.example.gabriel.testgooglemaps;
 
-import android.provider.MediaStore;
 import android.util.Base64;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.io.RandomAccessFile;
-import java.io.Reader;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.Buffer;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
-import java.util.zip.GZIPInputStream;
 
 public class HttpPost {
 
@@ -35,8 +26,14 @@ public class HttpPost {
 
     private URL url;
     private ByteArrayOutputStream buffer;
+    String token = null, client = null, uid = null;
 
-    public HttpPost() {
+    Map<String, List<String>> responseHeader = null;
+    String response = null;
+    int responseCode = -1;
+
+
+    public HttpPost(URL url, String token, String client, String uid) {
         // Generate random boundary
         // Boundary length: max. 70 characters (not counting the two leading hyphens)
         byte[] random = new byte[40];
@@ -45,30 +42,32 @@ public class HttpPost {
 
         // Init buffer
         buffer = new ByteArrayOutputStream();
+
+        this.url    = url;
+        this.token  = token;
+        this.client = client;
+        this.uid    = uid;
     }
 
     public void setTarget(URL url) {
         this.url = url;
     }
 
-    public void add(String key, String value) throws IOException {
+    public void add(NameValuePair nvp) throws IOException {
         //addToBuffer("--" + boundary + CRLF);
         //addToBuffer("Content-Disposition: form-data; name=\"" + key + "\"" + CRLF);
         //addToBuffer("Content-Type: text/plain; charset=UTF-8" + CRLF + CRLF);
-        addToBuffer(key + "=" + value + CRLF);
+        //addToBuffer(key + "=" + value + CRLF);
+
+        values.add(nvp);
     }
 
-    public void add(String key, byte[] fileBytes) throws IOException {
-        //addToBuffer("--" + boundary + CRLF);
-        addToBuffer("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + key + "\"" + CRLF);
-        addToBuffer("Content-Type: application/octet-stream" + CRLF);
-        addToBuffer("Content-Transfer-Encoding: binary" + CRLF + CRLF);
-        addToBuffer(fileBytes);
-        addToBuffer(CRLF);
+    public void add(String key, String value) throws IOException {
+        values.add(new NameValuePair(key, value));
     }
 
-    public String send() throws IOException, URISyntaxException {
-        return otherPost(url.toURI().toString());
+    public int send() throws IOException, URISyntaxException {
+        return otherPost(url.toURI().toString(), token, client, uid);
 /*
         // Add boundary end
         addToBuffer("--" + boundary + "--" + CRLF);
@@ -143,11 +142,11 @@ public class HttpPost {
         }
     }
 
-    ArrayList<MapsActivity.NameValuePair> values = new ArrayList<>();
+    ArrayList<NameValuePair> values = new ArrayList<>();
     byte[] image;
     String imageName;
 
-    public String otherPost(String address) throws IOException {
+    public int otherPost(String address, String token, String client, String uid) throws IOException {
         //return null;
 
         byte[] postData       = buffer.toByteArray();
@@ -162,12 +161,16 @@ public class HttpPost {
         HttpURLConnection conn= (HttpURLConnection) url.openConnection();
         conn.setDoOutput( true );
         conn.setRequestProperty( "Content-Type", "multipart/form-data; boundary=" + boundary);
+        conn.setRequestProperty( "access-Token", token);
+        conn.setRequestProperty( "client", client);
+        conn.setRequestProperty( "uid", uid);
 
         try (
                 OutputStream output = conn.getOutputStream();
                 PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, charset), true)
         ) {
-            for(MapsActivity.NameValuePair nameValuePair : values){
+            for(NameValuePair nameValuePair : values){
+                System.out.println(nameValuePair.name + " : " + nameValuePair.value);
                 // Send normal param.
                 writer.append("--" + boundary).append(CRLF);
                 writer.append("Content-Disposition: form-data; name=\"" + nameValuePair.name + "\"").append(CRLF);
@@ -178,7 +181,7 @@ public class HttpPost {
             if(image != null) {
                 // Send binary file.
                 writer.append("--" + boundary).append(CRLF);
-                writer.append("Content-Disposition: form-data; name=\"binaryFile\"; filename=\"" + imageName + "\"").append(CRLF);
+                writer.append("Content-Disposition: form-data; name=\"binary_file\"; filename=\"" + imageName + "\"").append(CRLF);
                 writer.append("Content-Type: " + URLConnection.guessContentTypeFromName(imageName)).append(CRLF);
                 writer.append("Content-Transfer-Encoding: binary").append(CRLF);
                 writer.append(CRLF).flush();
@@ -193,7 +196,7 @@ public class HttpPost {
             writer.append("--" + boundary + "--").append(CRLF).flush();
         }
 
-        image = null;
+        responseHeader = conn.getHeaderFields();
 
         try(DataInputStream rd = new DataInputStream( conn.getInputStream() )){
 
@@ -209,8 +212,12 @@ public class HttpPost {
 
             //System.out.println(completeFile);
             System.out.println(completeLine);
-            return completeLine;
+            response = completeLine;
+        }catch (Exception e){
+
         }
 
+        responseCode = conn.getResponseCode();
+        return responseCode;
     }
 }
