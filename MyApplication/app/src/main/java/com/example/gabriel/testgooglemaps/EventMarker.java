@@ -1,6 +1,7 @@
 package com.example.gabriel.testgooglemaps;
 
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
@@ -17,25 +18,28 @@ public class EventMarker {
 
     public Event event;
 
-    public EventMarker(String title, LatLng latLng, Date startDate, Date endDate, GoogleMap googleMap){
-        this(title, latLng, INITIAL_SIZE_RADIUS, startDate, endDate, googleMap);
+    public EventMarker(String title, LatLng latLng, Date startDate, Date endDate, GoogleMap googleMap, String userEmail){
+        this(title, latLng, INITIAL_SIZE_RADIUS, startDate, endDate, googleMap, userEmail);
     }
 
-    public EventMarker(String name, LatLng latLng, int radius, Date startDate, Date endDate, GoogleMap googleMap){
-        this(new Event(name, radius, latLng.latitude, latLng.longitude, startDate.getTime(), endDate.getTime(), 0, "", "", "", "", ""), googleMap);
+    public EventMarker(String name, LatLng latLng, int radius, Date startDate, Date endDate, GoogleMap googleMap, String userEmail){
+        this(new Event(name, radius, latLng.latitude, latLng.longitude, startDate.getTime(), endDate.getTime(), 0, "", "", "", "", "", false), googleMap, userEmail);
     }
 
-    public EventMarker(Event baseEvent, GoogleMap googleMap){
-        event = new Event();
-        event.name = baseEvent.name;
-        event.radius = baseEvent.radius > 0 ? baseEvent.radius : 0;
-        event.latitude = baseEvent.latitude;
-        event.longitude = baseEvent.longitude;
+    public EventMarker(Event baseEvent, GoogleMap googleMap, String userEmail){
+        event = baseEvent.clone();
 
         LatLng latLng = new LatLng(event.latitude, event.longitude);
         MarkerOptions markerOptions = new MarkerOptions().position(latLng)
                 .title(event.name)
                 .draggable(false);
+
+        if(baseEvent.owner_email.equals(userEmail)){
+            markerOptions = markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+        }else if(baseEvent.checked_in){
+            markerOptions = markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+        }
+
         CircleOptions circleOptions = new CircleOptions().center(latLng)
                 .radius(event.radius)
                 .strokeWidth(5f);

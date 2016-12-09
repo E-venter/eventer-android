@@ -173,7 +173,7 @@ public class CadastrarActivity extends AppCompatActivity {
 
                 //stream.write();
 
-                photo.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+                photo.compress(Bitmap.CompressFormat.JPEG, 50, stream);
                 imageToSendToCheckIn = stream.toByteArray();
                 imageToSendToCheckInName = MapsActivity.TEMP_IMAGE_FILE_NAME + ".jpg";
                 imageToSendToCheckInName = MapsActivity.TEMP_IMAGE_FILE_NAME + ".jpg";

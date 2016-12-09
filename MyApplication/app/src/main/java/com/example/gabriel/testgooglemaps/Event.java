@@ -16,6 +16,8 @@ class Event {
     public String owner_name = "no_name";
     public String owner_email = "no_email";
 
+    public boolean checked_in = false;
+
     public Event(){}
 
     public Event(String name,
@@ -29,7 +31,8 @@ class Event {
                  String owner_name,
                  String address,
                  String description,
-                 String event_type) {
+                 String event_type,
+                 boolean checked_in) {
 
         this.name = name;
         this.latitude = latitude;
@@ -43,10 +46,16 @@ class Event {
         this.address = address;
         this.description = description;
         this.event_type = event_type;
+
+        this.checked_in = checked_in;
+    }
+
+    public Event clone(){
+        return new Event(name, latitude, longitude, radius, start_time, end_time, id, owner_email, owner_name, address, description, event_type, checked_in);
     }
 
     public String toString(){
-        return "name:" + name + " radius:" + radius + " latitude:" + latitude + " longitude:" + longitude;
+        return "id:" + id + "name:" + name + " radius:" + radius + " latitude:" + latitude + " longitude:" + longitude;
     }
 
     public boolean equals(Object e) {

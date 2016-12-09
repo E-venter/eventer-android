@@ -67,7 +67,9 @@
         <activity
             android:name=".CadastrarActivity"
             android:label="@string/title_activity_cadastrar"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity android:name=".ShoweventActivity" />
+        <activity android:name=".NavegationActivity"></activity>
     </application>
 
 </manifest>

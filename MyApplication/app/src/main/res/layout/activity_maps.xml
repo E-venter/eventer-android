@@ -5,4 +5,16 @@
     android:name="com.google.android.gms.maps.SupportMapFragment"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.gabriel.testgooglemaps.MapsActivity" />
+    tools:context="com.example.gabriel.testgooglemaps.MapsActivity" >
+
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/menu"
+        android:layout_gravity="left|top"
+        android:background="@mipmap/nav_menu"
+        android:padding="10dp"
+        android:layout_marginTop="20dp"
+        android:paddingLeft="20dp"/>
+
+</fragment>

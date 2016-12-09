@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.gabriel.testgooglemaps.MapsActivity" android:background="@mipmap/bgazul"
+    android:id="@+id/nav">
+
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/logout"
+        android:background="@mipmap/nav_logout"
+        android:layout_alignParentBottom="true" android:layout_centerHorizontal="true"
+        android:layout_marginBottom="70dp"/>
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/todosEventos"
+        android:background="@mipmap/nav_todoseventos"
+        android:layout_below="@+id/meusEventos" android:layout_alignStart="@+id/meusEventos"
+        android:layout_marginTop="70dp"/>
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/meusEventos"
+        android:background="@mipmap/nav_meuseventos" android:layout_below="@+id/logo"
+        android:layout_alignStart="@+id/logo" android:layout_marginTop="35dp"
+        android:layout_centerHorizontal="true"/>
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/logo"
+        android:background="@mipmap/ic_logo"
+        android:layout_marginTop="35dp"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="false" android:layout_alignParentStart="false"
+        android:layout_alignWithParentIfMissing="false" android:layout_centerHorizontal="true"/>
+</RelativeLayout>

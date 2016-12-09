@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.example.gabriel.testgooglemaps.MapsActivity" android:background="@mipmap/bgazul">
+
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/closeButton" android:background="@mipmap/close_branco" android:layout_gravity="top"
+        android:layout_marginLeft="0dp"
+        android:nestedScrollingEnabled="false"
+        android:layout_alignParentEnd="true" android:layout_alignParentStart="false"
+        android:layout_marginTop="30dp" android:layout_marginRight="30dp" android:focusable="true"/>
+    <ImageButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/fazerCheckIn"
+        android:background="@mipmap/fazercheckin" android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="30dp"
+        android:layout_marginLeft="30dp" android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="${NomeEvento}"
+        android:id="@+id/nomeEvento"
+        android:layout_alignParentStart="true" android:layout_marginTop="30dp" android:layout_marginLeft="30dp"
+        android:textStyle="bold" android:textColor="@color/my_white"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Endereço"
+        android:id="@+id/enderecoTitulo"
+        android:layout_marginTop="46dp" android:layout_below="@+id/nomeEvento"
+        android:layout_alignStart="@+id/nomeEvento" android:textStyle="bold"
+        android:textColor="@color/my_white"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="${Endereço}"
+        android:id="@+id/enderecoValor"
+        android:textColor="@color/my_white"
+        android:layout_marginLeft="50dp"
+        android:layout_above="@+id/dataIniTitulo" android:layout_toStartOf="@+id/closeButton"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="Data Início"
+        android:id="@+id/dataIniTitulo"
+        android:textStyle="bold"
+        android:textColor="@color/my_white"
+        android:layout_below="@+id/enderecoTitulo" android:layout_alignStart="@+id/enderecoTitulo"
+        android:layout_marginTop="10dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="${Data}"
+        android:id="@+id/dataIniValor"
+        android:textColor="@color/my_white"
+        android:layout_marginLeft="50dp"
+        android:layout_above="@+id/dataTerminoTitulo" android:layout_alignEnd="@+id/enderecoValor"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="Data Término"
+        android:id="@+id/dataTerminoTitulo" android:textStyle="bold"
+        android:textColor="@color/my_white"
+        android:layout_below="@+id/dataIniTitulo" android:layout_alignStart="@+id/dataIniTitulo"
+        android:layout_marginTop="10dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="${Data}"
+        android:id="@+id/dataFimValor" android:textColor="@color/my_white"
+        android:layout_marginLeft="50dp"
+        android:layout_below="@+id/dataIniValor" android:layout_alignEnd="@+id/dataIniValor"
+        android:layout_marginTop="10dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="Descrição"
+        android:id="@+id/descricaoTitulo" android:textStyle="bold"
+        android:textColor="@color/my_white"
+        android:layout_below="@+id/dataTerminoTitulo" android:layout_alignStart="@+id/dataTerminoTitulo"
+        android:layout_marginTop="10dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium" android:text="${descricao lalalalalalala} ${descricao lalalalalalala} ${descricao lalalalalalala}"
+        android:id="@+id/descricaoValor"
+        android:textColor="@color/my_white"
+        android:layout_marginLeft="50dp"
+        android:layout_below="@+id/descricaoTitulo" android:layout_alignStart="@+id/descricaoTitulo"
+        android:layout_marginTop="10dp" android:layout_alignEnd="@+id/dataFimValor"/>
+</RelativeLayout>
