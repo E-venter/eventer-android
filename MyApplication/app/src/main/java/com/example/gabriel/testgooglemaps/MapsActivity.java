@@ -545,7 +545,13 @@ public class MapsActivity extends FragmentActivity
                     if (postContent != null) {
                         el = new Gson().fromJson(postContent, EventList.class);
 
-                        mMap.clear();
+                        //mMap.clear();
+
+                        for (Integer integer : eventList.keySet()) {
+                            eventList.get(integer).getMarker().remove();
+                            eventList.get(integer).getCircle().remove();
+                        }
+
                         if (el != null && el.list != null) {
                             for (Event e : el.list) {
                                 System.out.println(e.toString());
